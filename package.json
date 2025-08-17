@@ -1,6 +1,6 @@
 {
     "name": "telegram-pinger",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Отправляет уведомления в Telegram при упоминании бота в чате.",
     "main": "index.js",
     "author": "merka",
@@ -41,7 +41,7 @@
           "messageFormatWithAuth": {
             "type": "string",
             "label": "Формат (с плагином авторизации)",
-            "default": "🔔 Пинг!\nСервер: {serverHost} (Портал: {portal})\nСообщение: {rawMessage}"
+            "default": "🔔 Пинг!\nСервер: {serverHost} (Портал: {portalCommand})\nСообщение: {rawMessage}"
           },
           "messageFormatWithParser": {
             "type": "string",
@@ -51,7 +51,7 @@
           "messageFormatFull": {
             "type": "string",
             "label": "Формат (полный)",
-            "default": "🔔 Пинг!\nОт: {sender}\nСервер: {serverHost} (Портал: {portal})\nСообщение: {rawMessage}"
+            "default": "🔔 Пинг!\nОт: {sender}\nСервер: {serverHost} (Портал: {portalCommand})\nСообщение: {rawMessage}"
           }
         }
       }
