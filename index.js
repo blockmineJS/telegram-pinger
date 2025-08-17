@@ -21,8 +21,16 @@ async function onLoad(bot, { settings, store }) {
   }
 
   let cleanupPingListener = null;
+  let isListenerActive = false;
 
   const hasAuthPlugin = bot.api.installedPlugins.includes(AUTH_PLUGIN_NAME);
+
+  const activateListener = () => {
+    if (isListenerActive) return;
+    cleanupPingListener = registerPingListener(bot, settings, telegramSender, portalInfo);
+    isListenerActive = true;
+    log('[TelegramPinger] Слушатель сообщений активирован.');
+  };
 
   const portalListener = async (payload) => {
     if (payload && payload.command && typeof payload.command === 'string') {
@@ -30,14 +38,18 @@ async function onLoad(bot, { settings, store }) {
       portalInfo.portal = portalCommand;
       await store.set('last_portal_command', portalCommand);
       log(`[TelegramPinger] Получена и сохранена команда входа на портал: ${portalCommand}`);
+      activateListener();
+    } else {
+        log(`[TelegramPinger] Событие auth:portal_joined получено, но не удалось извлечь команду. Payload: ${JSON.stringify(payload)}`, 'warn');
     }
   };
 
   if (hasAuthPlugin) {
     bot.events.on('auth:portal_joined', portalListener);
+    log('[TelegramPinger] Плагин авторизации найден. Ожидание входа на портал для активации...');
+  } else {
+    activateListener();
   }
-  
-  cleanupPingListener = registerPingListener(bot, settings, telegramSender, portalInfo);
 
   bot.once('end', () => {
     if (cleanupPingListener) {
@@ -49,7 +61,7 @@ async function onLoad(bot, { settings, store }) {
     log('[TelegramPinger] Плагин выгружен, все слушатели событий удалены.');
   });
 
-  log('[TelegramPinger] Плагин успешно загружен и готов к работе.');
+  log('[TelegramPinger] Плагин успешно загружен.');
 }
 
 module.exports = { onLoad };
