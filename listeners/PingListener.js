@@ -3,29 +3,49 @@ const { PARSER_PLUGIN_NAME } = require('../constants');
 function registerPingListener(bot, settings, telegramSender, portalInfo) {
   const botUsernameLower = bot.config.username.toLowerCase();
   const ignoredUsersLower = (settings.ignoredUsers || []).map(u => u.toLowerCase());
-
   const hasParser = bot.api.installedPlugins.includes(PARSER_PLUGIN_NAME);
 
-  const processMessage = (jsonMsg, sender = 'Неизвестно') => {
-    if (!jsonMsg) return;
+  const senderCache = new Map();
+  const CACHE_TTL = 500;
 
-    const rawMessage = jsonMsg.toString();
+  const parsedListener = (data) => {
+    const rawMessage = data.jsonMsg ? data.jsonMsg.toString() : data.raw;
+    if (rawMessage && data.username) {
+      senderCache.set(rawMessage, data.username);
+      setTimeout(() => senderCache.delete(rawMessage), CACHE_TTL);
+    }
+  };
+
+  const rawListener = (rawMessageText, jsonMsg) => {
+    const rawMessage = jsonMsg ? jsonMsg.toString() : rawMessageText;
+    if (!rawMessage) return;
+
+    const sender = senderCache.get(rawMessage) || 'Неизвестно';
     
+    if (senderCache.has(rawMessage)) {
+        senderCache.delete(rawMessage);
+    }
+
+    if (sender.toLowerCase() === botUsernameLower) {
+      return;
+    }
+
     const regex = new RegExp(`\\b${botUsernameLower}\\b`, 'i');
     if (!regex.test(rawMessage.toLowerCase())) {
       return;
     }
-    
+
     if (ignoredUsersLower.includes(sender.toLowerCase())) {
       return;
     }
 
     let formatTemplate;
     const hasAuth = portalInfo.portal !== null;
+    const senderIsKnown = sender !== 'Неизвестно';
     
-    if (hasParser && hasAuth) {
+    if (senderIsKnown && hasAuth) {
       formatTemplate = settings.messageFormatFull;
-    } else if (hasParser) {
+    } else if (senderIsKnown) {
       formatTemplate = settings.messageFormatWithParser;
     } else if (hasAuth) {
       formatTemplate = settings.messageFormatWithAuth;
@@ -34,39 +54,28 @@ function registerPingListener(bot, settings, telegramSender, portalInfo) {
     }
 
     if (!formatTemplate) {
-        bot.sendLog('[TelegramPinger] Шаблон сообщения не найден в настройках. Проверьте package.json.', 'warn');
+        bot.sendLog('[TelegramPinger] Шаблон сообщения не найден в настройках.', 'warn');
         return;
     }
 
     const messageText = formatTemplate
       .replace('{serverHost}', bot.config.server.host)
-      .replace('{portal}', portalInfo.portal)
       .replace('{portalCommand}', portalInfo.portal)
       .replace('{sender}', sender)
       .replace('{rawMessage}', rawMessage);
 
     telegramSender.sendMessage(messageText);
   };
-  
-  const rawListener = (rawMessageText, jsonMsg) => {
-    processMessage(jsonMsg);
-  };
 
-  const parsedListener = (data) => {
-    processMessage(data.jsonMsg, data.username);
-  };
-
+  bot.events.on('core:raw_message', rawListener);
   if (hasParser) {
     bot.events.on('chat:message', parsedListener);
-  } else {
-    bot.events.on('core:raw_message', rawListener);
   }
 
   return () => {
+    bot.events.removeListener('core:raw_message', rawListener);
     if (hasParser) {
       bot.events.removeListener('chat:message', parsedListener);
-    } else {
-      bot.events.removeListener('core:raw_message', rawListener);
     }
   };
 }
